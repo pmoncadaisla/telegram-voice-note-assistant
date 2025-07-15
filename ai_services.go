@@ -7,11 +7,34 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/google/generative-ai-go/genai"
 )
+
+// transcribeAndSummarize sends the audio data to Gemini for transcription and summary.
+func transcribeAndSummarize(ctx context.Context, model *genai.GenerativeModel, audioData []byte) (string, string, error) {
+	prompt := "You are an assistant receiving voice notes. First, transcribe the voice note from my wife. Second, generate a concise summary in Spanish with the most important points. Return ONLY the transcription and the summary, separated by '---'. For example: 'Transcription: [text] --- Summary: [text]'"
+	resp, err := model.GenerateContent(ctx, genai.Blob{MIMEType: "audio/ogg", Data: audioData}, genai.Text(prompt))
+	if err != nil {
+		return "", "", errors.Wrap(err, "failed to generate content with Gemini")
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return "", "", errors.New("Gemini returned no content")
+	}
+	content := resp.Candidates[0].Content.Parts[0].(genai.Text)
+	parts := strings.SplitN(string(content), "---", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("unexpected response format from Gemini: %s", content)
+	}
+	transcription := strings.TrimSpace(strings.TrimPrefix(parts[0], "Transcripción:"))
+	summary := strings.TrimSpace(strings.TrimPrefix(parts[1], "Resumen:"))
+
+	return transcription, summary, nil
+}
 
 // generateAffirmativeReply uses Gemini to create a loving response.
 func generateAffirmativeReply(ctx context.Context, model *genai.GenerativeModel, transcription string) (string, error) {

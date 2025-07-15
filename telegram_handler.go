@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/gotd/td/telegram"
@@ -35,25 +34,11 @@ func processVoiceNote(ctx context.Context, client *telegram.Client, model *genai
 
 	// 2. Transcribe and summarize with Gemini
 	log.Println("Sending audio to Gemini for transcription and summary...")
-	prompt := "You are an assistant receiving voice notes. First, transcribe the voice note from my wife. Second, generate a concise summary in Spanish with the most important points. Return ONLY the transcription and the summary, separated by '---'. For example: 'Transcription: [text] --- Summary: [text]'"
-	resp, err := model.GenerateContent(ctx, genai.Blob{MIMEType: "audio/ogg", Data: audioData}, genai.Text(prompt))
+	transcription, summary, err := transcribeAndSummarize(ctx, model, audioData)
 	if err != nil {
-		log.Printf("Failed to generate content with Gemini: %+v", err)
+		log.Printf("Failed to transcribe and summarize: %+v", err)
 		return
 	}
-
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		log.Println("Error: Gemini returned no content.")
-		return
-	}
-	content := resp.Candidates[0].Content.Parts[0].(genai.Text)
-	parts := strings.SplitN(string(content), "---", 2)
-	if len(parts) != 2 {
-		log.Printf("Error: Unexpected response format from Gemini: %s", content)
-		return
-	}
-	transcription := strings.TrimSpace(strings.TrimPrefix(parts[0], "Transcripción:"))
-	summary := strings.TrimSpace(strings.TrimPrefix(parts[1], "Resumen:"))
 
 	// 3. Send summary to "Saved Messages"
 	log.Println("Sending summary to 'Saved Messages'...")
