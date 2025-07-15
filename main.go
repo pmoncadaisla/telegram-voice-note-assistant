@@ -33,6 +33,7 @@ type Config struct {
 	AppHash           string
 	TargetUserID      int64
 	GeminiAPIKey      string
+	GeminiModel       string
 	ElevenLabsAPIKey  string
 	ElevenLabsVoiceID string
 }
@@ -54,7 +55,7 @@ func run(ctx context.Context) error {
 		return errors.Wrap(err, "error al crear el cliente de Gemini")
 	}
 	defer geminiClient.Close()
-	geminiModel := geminiClient.GenerativeModel("models/gemini-1.5-flash")
+	geminiModel := geminiClient.GenerativeModel(cfg.GeminiModel)
 
 	dispatcher := tg.NewUpdateDispatcher()
 	client := telegram.NewClient(cfg.AppID, cfg.AppHash, telegram.Options{
@@ -132,6 +133,7 @@ func run(ctx context.Context) error {
 		}
 
 		log.Println("Cliente conectado y escuchando mensajes...")
+		log.Println("Usando modelo de Gemini:", cfg.GeminiModel)
 		<-ctx.Done()
 		return ctx.Err()
 	})
@@ -156,7 +158,7 @@ func processVoiceNote(ctx context.Context, client *telegram.Client, model *genai
 
 	// 2. Transcribir y resumir con Gemini
 	log.Println("Enviando audio a Gemini para transcribir y resumir...")
-	prompt := "Eres un asistente que recibe notas de voz. Primero, transcribe la nota de voz de mi mujer. Segundo, genera un resumen conciso en español con los puntos más importantes. Devuelve SOLO la transcripción y el resumen, separados por '---'. Por ejemplo: 'Transcripción: [texto] --- Resumen: [texto]'"
+	prompt := "Genera un resumen de la nota de voz que me manda mi mujer con puntos más importantes. Genera la respuesta formateado para Telegram. '"
 	resp, err := model.GenerateContent(ctx, genai.Blob{MIMEType: "audio/ogg", Data: audioData}, genai.Text(prompt))
 	if err != nil {
 		log.Printf("Error al generar contenido con Gemini: %+v", err)
@@ -239,7 +241,7 @@ func processVoiceNote(ctx context.Context, client *telegram.Client, model *genai
 
 // generateAffirmativeReply usa Gemini para crear una respuesta cariñosa.
 func generateAffirmativeReply(ctx context.Context, model *genai.GenerativeModel, transcription string) (string, error) {
-	prompt := fmt.Sprintf("Actúa como si fueras mi marido. Mi mujer, a la que llamo 'Amor', me ha enviado el siguiente mensaje: '%s'. Genera una respuesta corta (máximo 20 palabras), amigable y amorosa, siempre dándole la razón y mostrando acuerdo. Usa un tono cercano y cariñoso. Refiérete a ella como 'Bey' o 'Amor' pero elige solo una de las dos. No digas cocosas como 'Beso' o 'Te quiero' ya que no se las suelo decir nunca.", transcription)
+	prompt := fmt.Sprintf("Actúa como si fueras mi marido. Mi mujer, a la que llamo 'Amor', me ha enviado el siguiente mensaje: '%s'. Genera una respuesta corta usando vocabulario de Español de Madrid (máximo 20 palabras), amigable y amorosa, siempre dándole la razón y mostrando acuerdo. Usa un tono cercano y cariñoso. Refiérete a ella como 'Bey' o 'Amor' pero elige solo una de las dos. No digas cocosas como 'Beso' o 'Te quiero' ya que no se las suelo decir nunca.", transcription)
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		return "", errors.Wrap(err, "fallo en la llamada a Gemini para la respuesta")
@@ -309,12 +311,17 @@ func loadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, errors.Wrap(err, "TARGET_USER_ID inválido")
 	}
+	geminiModel := os.Getenv("GEMINI_MODEL")
+	if geminiModel == "" {
+		return Config{}, errors.New("la variable de entorno GEMINI_MODEL no está definida")
+	}
 
 	cfg := Config{
 		AppID:             appID,
 		AppHash:           os.Getenv("APP_HASH"),
 		TargetUserID:      targetUserID,
 		GeminiAPIKey:      os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:       geminiModel,
 		ElevenLabsAPIKey:  os.Getenv("ELEVENLABS_API_KEY"),
 		ElevenLabsVoiceID: os.Getenv("ELEVENLABS_VOICE_ID"),
 	}
