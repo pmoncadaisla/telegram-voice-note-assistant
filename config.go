@@ -13,6 +13,7 @@ type Config struct {
 	AppHash           string
 	TargetUserID      int64
 	GeminiAPIKey      string
+	GeminiModel       string // Optional, if not set it will be prompted
 	ElevenLabsAPIKey  string
 	ElevenLabsVoiceID string
 }
@@ -36,11 +37,16 @@ func loadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, errors.Wrap(err, "invalid TARGET_USER_ID")
 	}
+	geminiModel := os.Getenv("GEMINI_MODEL")
+	if geminiModel == "" {
+		geminiModel = "models/gemini-2.5-flash" // Default model
+	}
 
 	cfg := Config{
 		AppID:             appID,
 		AppHash:           os.Getenv("APP_HASH"),
 		TargetUserID:      targetUserID,
+		GeminiModel:       geminiModel,
 		GeminiAPIKey:      os.Getenv("GEMINI_API_KEY"),
 		ElevenLabsAPIKey:  os.Getenv("ELEVENLABS_API_KEY"),
 		ElevenLabsVoiceID: os.Getenv("ELEVENLABS_VOICE_ID"),

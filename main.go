@@ -33,7 +33,7 @@ func run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to create Gemini client")
 	}
 	defer geminiClient.Close()
-	geminiModel := geminiClient.GenerativeModel("models/gemini-1.5-flash")
+	geminiModel := geminiClient.GenerativeModel(cfg.GeminiModel)
 
 	dispatcher := tg.NewUpdateDispatcher()
 	client := telegram.NewClient(cfg.AppID, cfg.AppHash, telegram.Options{
